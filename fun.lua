@@ -6,6 +6,8 @@
 --- Distributed under the MIT/X11 License. See COPYING.md for more details.
 ---
 
+local jit = require 'jit'
+
 local exports = {}
 local methods = {}
 
@@ -89,10 +91,9 @@ end
 
 local ipairs_gen = ipairs({}) -- get the generating function from ipairs
 
-local pairs_gen = pairs({ a = 0 }) -- get the generating function from pairs
-local map_gen = function(tab, key)
-    local value
-    local key, value = pairs_gen(tab, key)
+local pairs_gen = function(tab, key)
+    local gen = pairs({ a = 0 }) -- get the generating function from pairs
+    local key, value = gen(tab, key)
     return key, key, value
 end
 
@@ -114,7 +115,7 @@ local rawiter = function(obj, param, state)
             return ipairs(obj)
         else
             -- hash
-            return map_gen, obj, nil
+            return pairs_gen, obj, nil
         end
     elseif (type(obj) == "function") then
         return obj, param, state
@@ -170,6 +171,7 @@ local export2 = function(fun)
 end
 
 local each = function(fun, gen, param, state)
+    jit.flush(each)
     repeat
         state = call_if_not_empty(fun, gen(param, state))
     until state == nil
@@ -296,13 +298,14 @@ exports.rands = rands
 --------------------------------------------------------------------------------
 
 local nth = function(n, gen_x, param_x, state_x)
+    jit.flush(nth)
     assert(n > 0, "invalid first argument to nth")
     -- An optimization for arrays and strings
     if gen_x == ipairs_gen then
-        return param_x[n]
+        return param_x[n + state_x]
     elseif gen_x == string_gen then
         if n <= #param_x then
-            return string.sub(param_x, n, n)
+            return string.sub(param_x, n + state_x, n + state_x)
         else
             return nil
         end
@@ -584,6 +587,7 @@ local foldl_call = function(fun, start, state, ...)
 end
 
 local foldl = function(fun, start, gen_x, param_x, state_x)
+    jit.flush(foldl)
     while true do
         state_x, start = foldl_call(fun, start, gen_x(param_x, state_x))
         if state_x == nil then
@@ -598,6 +602,7 @@ methods.reduce = methods.foldl
 exports.reduce = exports.foldl
 
 local length = function(gen, param, state)
+    jit.flush(length)
     if gen == ipairs_gen or gen == string_gen then
         return #param
     end
@@ -637,6 +642,7 @@ methods.is_prefix_of = is_prefix_of
 exports.is_prefix_of = is_prefix_of
 
 local all = function(fun, gen_x, param_x, state_x)
+    jit.flush(any)
     local r
     repeat
         state_x, r = call_if_not_empty(fun, gen_x(param_x, state_x))
@@ -649,6 +655,7 @@ methods.every = methods.all
 exports.every = exports.all
 
 local any = function(fun, gen_x, param_x, state_x)
+    jit.flush(any)
     local r
     repeat
         state_x, r = call_if_not_empty(fun, gen_x(param_x, state_x))
@@ -661,6 +668,7 @@ methods.some = methods.any
 exports.some = exports.any
 
 local sum = function(gen, param, state)
+    jit.flush(sum)
     local s = 0
     local r = 0
     repeat
@@ -673,6 +681,7 @@ methods.sum = method0(sum)
 exports.sum = export0(sum)
 
 local product = function(gen, param, state)
+    jit.flush(product)
     local p = 1
     local r = 1
     repeat
@@ -693,6 +702,7 @@ local max_cmp = function(m, n)
 end
 
 local min = function(gen, param, state)
+    jit.flush(min)
     local state, m = gen(param, state)
     if state == nil then
         error("min: iterator is empty")
@@ -717,6 +727,7 @@ methods.minimum = methods.min
 exports.minimum = exports.min
 
 local min_by = function(cmp, gen_x, param_x, state_x)
+    jit.flush(min_by)
     local state_x, m = gen_x(param_x, state_x)
     if state_x == nil then
         error("min: iterator is empty")
@@ -733,6 +744,7 @@ methods.minimum_by = methods.min_by
 exports.minimum_by = exports.min_by
 
 local max = function(gen_x, param_x, state_x)
+    jit.flush(max)
     local state_x, m = gen_x(param_x, state_x)
     if state_x == nil then
         error("max: iterator is empty")
@@ -757,6 +769,7 @@ methods.maximum = methods.max
 exports.maximum = exports.max
 
 local max_by = function(cmp, gen_x, param_x, state_x)
+    jit.flush(max_by)
     local state_x, m = gen_x(param_x, state_x)
     if state_x == nil then
         error("max: iterator is empty")
@@ -773,6 +786,7 @@ methods.maximum_by = methods.max_by
 exports.maximum_by = exports.max_by
 
 local totable = function(gen_x, param_x, state_x)
+    jit.flush(totable)
     local tab, key, val = {}
     while true do
         state_x, val = gen_x(param_x, state_x)
@@ -787,6 +801,7 @@ methods.totable = method0(totable)
 exports.totable = export0(totable)
 
 local tomap = function(gen_x, param_x, state_x)
+    jit.flush(tomap)
     local tab, key, val = {}
     while true do
         state_x, key, val = gen_x(param_x, state_x)
