@@ -797,8 +797,8 @@ local tolist = function(gen_x, param_x, state_x)
     end
     return tab
 end
-methods.totable = method0(tolist)
-exports.totable = export0(tolist)
+methods.tolist = method0(tolist)
+exports.tolist = export0(tolist)
 
 local tomap = function(gen_x, param_x, state_x)
     jit.flush()
